@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Rexy — Chat Bot</title>
+<style>
+  :root { --bg:#0f172a; --panel:#1e293b; --accent:#22c55e; --text:#f1f5f9; --muted:#94a3b8; --bubble-bot:#334155; --bubble-user:#22c55e; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; }
+  header { padding:16px 20px; background:#020617; border-bottom:1px solid #1e293b; display:flex; align-items:center; gap:12px; }
+  .avatar { width:40px; height:40px; border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; font-size:22px; flex:none; }
+  header h1 { font-size:18px; margin:0; }
+  header p { margin:2px 0 0; font-size:13px; color:var(--muted); }
+  .status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--accent); margin-right:6px; }
+  main { flex:1; display:flex; justify-content:center; padding:16px; }
+  .chat-shell { width:100%; max-width:720px; background:var(--panel); border:1px solid #334155; border-radius:16px; display:flex; flex-direction:column; overflow:hidden; height:calc(100vh - 140px); min-height:420px; }
+  #messages { flex:1; overflow-y:auto; padding:18px 14px; display:flex; flex-direction:column; gap:10px; }
+  .msg { max-width:80%; padding:10px 14px; border-radius:14px; line-height:1.45; font-size:15px; white-space:pre-wrap; word-wrap:break-word; }
+  .msg.bot { align-self:flex-start; background:var(--bubble-bot); border-bottom-left-radius:4px; }
+  .msg.user { align-self:flex-end; background:var(--bubble-user); color:#052e16; border-bottom-right-radius:4px; }
+  .msg .time { display:block; font-size:11px; opacity:.65; margin-top:4px; }
+  .typing { align-self:flex-start; background:var(--bubble-bot); padding:10px 16px; border-radius:14px; font-size:14px; color:var(--muted); }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; padding:0 14px 10px; }
+  .chips button { background:#0f172a; color:var(--text); border:1px solid #475569; border-radius:999px; padding:7px 13px; font-size:13px; cursor:pointer; }
+  .chips button:hover { border-color:var(--accent); color:var(--accent); }
+  form { display:flex; gap:8px; padding:12px 14px; border-top:1px solid #334155; background:#0f172a; }
+  input { flex:1; background:#1e293b; border:1px solid #475569; border-radius:10px; color:var(--text); padding:12px; font-size:15px; outline:none; }
+  input:focus { border-color:var(--accent); }
+  form button { background:var(--accent); border:none; border-radius:10px; padding:0 20px; font-size:15px; font-weight:700; color:#052e16; cursor:pointer; }
+  form button:hover { filter:brightness(1.1); }
+  footer { text-align:center; color:var(--muted); font-size:12px; padding:10px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="avatar" aria-hidden="true">🦖</div>
+  <div>
+    <h1>Rexy — Chat Bot</h1>
+    <p><span class="status-dot"></span><span id="status">Online · replies instantly · no sign-in</span></p>
+  </div>
+</header>
+<main>
+  <section class="chat-shell" aria-label="Chat">
+    <div id="messages" role="log" aria-live="polite"></div>
+    <div class="chips" id="chips"></div>
+    <form id="composer">
+      <input id="input" type="text" placeholder="Ask Rexy anything… (try “help”)" autocomplete="off" maxlength="500" />
+      <button type="submit">Send</button>
+    </form>
+  </section>
+</main>
+<footer>Rexy runs 100% in your browser — no server, no tracking.</footer>
+<script>
+(function () {
+  var log = document.getElementById('messages');
+  var form = document.getElementById('composer');
+  var input = document.getElementById('input');
+  var chips = document.getElementById('chips');
+
+  function time() {
+    var d = new Date();
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  function add(text, who) {
+    var div = document.createElement('div');
+    div.className = 'msg ' + who;
+    var span = document.createElement('span');
+    span.textContent = text;
+    div.appendChild(span);
+    var t = document.createElement('span');
+    t.className = 'time';
+    t.textContent = (who === 'user' ? 'You' : 'Rexy') + ' · ' + time();
+    div.appendChild(t);
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+    return div;
+  }
+  function replyFor(q) {
+    var s = q.toLowerCase().trim();
+    if (!s) return 'Type a message and I will answer. Try "help".';
+    if (/(^|\W)(hi|hello|hey|yo|sup)(\W|$)/.test(s)) return 'Hello! I am Rexy. Ask me for help, the time, a joke, or anything on your mind.';
+    if (s.includes('help') || s.includes('what can you')) return 'Here is what I can do:\n• help — show this menu\n• time / date — current time\n• joke — a clean joke\n• weather — demo answer\n• who are you — about me\n• clear — wipe the chat\nJust type naturally, I match keywords!';
+    if (s.includes('time') || s.includes('date') || s.includes('day')) return 'Current browser time is ' + new Date().toLocaleString() + '.';
+    if (s.includes('joke')) {
+      var jokes = [
+        'Why do programmers prefer dark mode? Because light attracts bugs!',
+        'Why did the chatbot cross the road? To optimize the other side.',
+        'I told my computer I needed a break… now it sends me KitKat ads.'
+      ];
+      return jokes[Math.floor(Math.random() * jokes.length)];
+    }
+    if (s.includes('weather')) return 'Demo answer: I cannot fetch live weather offline, but it is always sunny inside this chat. Try asking for a joke instead!';
+    if (s.includes('who are you') || s.includes('your name') || s.includes('rexy')) return 'I am Rexy, a tiny rule-based chat bot that lives in a single static page. No servers, no tracking — just JavaScript.';
+    if (s.includes('thank')) return 'You are welcome! Anything else I can help with?';
+    if (s.includes('bye')) return 'Goodbye! I will be right here when you come back.';
+    if (s.includes('clear') || s.includes('reset')) { setTimeout(clear, 600); return 'Clearing the chat…'; }
+    if (s.includes('love') || s.includes('like you')) return 'That is kind of you! I like chatting with you too.';
+    if (s.endsWith('?')) return 'Good question! My built-in brain says: "' + q.slice(0, 120) + '" deserves some thought. I am a demo bot — I match keywords like help, time, joke, weather. What else can I try?';
+    return 'You said: "' + q.slice(0, 200) + '". I am a lightweight demo bot. Try "help" to see what I understand.';
+  }
+  function clear() { log.innerHTML = ''; greet(false); }
+  function send(text) {
+    var q = (text !== undefined ? text : input.value).trim();
+    if (!q) return;
+    add(q, 'user');
+    input.value = '';
+    var t = document.createElement('div');
+    t.className = 'typing';
+    t.textContent = 'Rexy is typing…';
+    log.appendChild(t);
+    log.scrollTop = log.scrollHeight;
+    setTimeout(function () {
+      t.remove();
+      add(replyFor(q), 'bot');
+    }, 450 + Math.random() * 450);
+  }
+  function greet(first) {
+    add(first
+      ? 'Hi, I am Rexy! Your friendly static chat bot. Try a quick topic below or type "help".'
+      : 'Chat cleared. What shall we talk about?', 'bot');
+  }
+  var suggestions = ['help', 'Tell me a joke', 'What time is it?', 'Who are you?', 'Thanks!'];
+  suggestions.forEach(function (s) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = s;
+    b.addEventListener('click', function () { send(s); });
+    chips.appendChild(b);
+  });
+  form.addEventListener('submit', function (e) { e.preventDefault(); send(); });
+  greet(true);
+})();
+</script>
+</body>
+</html>
